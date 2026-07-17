@@ -9,5 +9,6 @@ wheels/
 data/
 data/*
 .env
+keys.json
 # Virtual environments
 .venv

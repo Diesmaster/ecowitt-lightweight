@@ -14,6 +14,9 @@ read-everything-then-filter.
 Every response also carries a `storage_status` field - the current
 disk-usage cache, appended for free rather than recomputed per request;
 see app.services.storage_status_cache.
+
+Both endpoints require a valid `X-API-Key` header, scoped to this
+route and to the requested `passkey` - see app.security.dependencies.
 """
 
 from __future__ import annotations
@@ -21,8 +24,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import Enum
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.security.dependencies import require_api_key
 from app.storage.registry import DATA_TYPE_STORES, storage_status_cache
 
 router = APIRouter()
@@ -40,7 +44,7 @@ def _ensure_utc(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
 
-@router.get("/data/{passkey}/{data_type}/current")
+@router.get("/data/{passkey}/{data_type}/current", dependencies=[Depends(require_api_key)])
 def get_current(passkey: str, data_type: DataType):
     store = DATA_TYPE_STORES[data_type.value]
     row = store.read_latest(passkey)
@@ -55,7 +59,7 @@ def get_current(passkey: str, data_type: DataType):
     }
 
 
-@router.get("/data/{passkey}/{data_type}/range")
+@router.get("/data/{passkey}/{data_type}/range", dependencies=[Depends(require_api_key)])
 def get_range(
     passkey: str,
     data_type: DataType,

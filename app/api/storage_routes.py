@@ -10,17 +10,22 @@ relying on the HTTP status code as the signal.
 
 Like every other GET endpoint, this reads the cache rather than
 re-walking the data directory - see app.services.storage_status_cache.
+
+Requires a valid `X-API-Key` header - see app.security.dependencies.
+This route has no `passkey` path parameter, so only endpoint scoping
+applies, not per-station scoping.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.security.dependencies import require_api_key
 from app.storage.registry import storage_status_cache
 
 router = APIRouter()
 
 
-@router.get("/storage/status")
+@router.get("/storage/status", dependencies=[Depends(require_api_key)])
 def get_storage_status():
     return storage_status_cache.current.to_dict()
