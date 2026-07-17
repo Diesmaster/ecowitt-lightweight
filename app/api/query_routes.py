@@ -10,6 +10,10 @@ read_range(), which use Polars' lazy scan + pushdown to prune parquet
 row groups by their timestamp statistics rather than reading the whole
 file - see the docstrings there for why that's "smart" and not just
 read-everything-then-filter.
+
+Every response also carries a `storage_status` field - the current
+disk-usage cache, appended for free rather than recomputed per request;
+see app.services.storage_status_cache.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from enum import Enum
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.storage.registry import DATA_TYPE_STORES
+from app.storage.registry import DATA_TYPE_STORES, storage_status_cache
 
 router = APIRouter()
 
@@ -45,7 +49,10 @@ def get_current(passkey: str, data_type: DataType):
             status_code=404,
             detail=f"no '{data_type.value}' data found for station {passkey!r}",
         )
-    return row.to_dicts()[0]
+    return {
+        "data": row.to_dicts()[0],
+        "storage_status": storage_status_cache.current.to_dict(),
+    }
 
 
 @router.get("/data/{passkey}/{data_type}/range")
@@ -65,4 +72,7 @@ def get_range(
 
     store = DATA_TYPE_STORES[data_type.value]
     df = store.read_range(passkey, start, end)
-    return df.to_dicts()
+    return {
+        "data": df.to_dicts(),
+        "storage_status": storage_status_cache.current.to_dict(),
+    }

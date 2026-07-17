@@ -5,7 +5,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 
 from app.models.ecowitt import EcowittPayload
-from app.storage.registry import aggregation_service, raw_store
+from app.storage.registry import aggregation_service, raw_store, storage_status_cache
 from app.utils.metric_utils import to_metric
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,18 @@ async def receive_report(request: Request):
     # Ecowitt's ~once-every-30s cadence this is cheap; see
     # AggregationService's docstring if that ever needs to change.
     await aggregation_service.recompute_all(payload.PASSKEY)
+
+    # Every write changes disk usage, so this is the point that
+    # invalidates the cache - GET endpoints just read it, they never
+    # recompute it themselves.
+    try:
+        storage_status_cache.refresh()
+    except Exception:
+        # Storage monitoring is observability, not core functionality -
+        # a failure here shouldn't take down data ingestion. Logged loudly
+        # so it's visible, but the write above already succeeded and
+        # should still be reported as such.
+        logger.exception("failed to refresh storage status cache after write")
 
     # Ecowitt stations just need a 200 with some body to consider it delivered.
     return PlainTextResponse("success")

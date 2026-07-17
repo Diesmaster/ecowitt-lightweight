@@ -19,22 +19,30 @@ def main() -> None:
         start = (now - datetime.timedelta(hours=1)).isoformat()
         end = (now + datetime.timedelta(minutes=1)).isoformat()
 
-        raw = c.get(f"/data/{PASSKEY}/raw/range", params={"start": start, "end": end}).json()
-        agg_1m = c.get(f"/data/{PASSKEY}/1m/range", params={"start": start, "end": end}).json()
+        raw_body = c.get(f"/data/{PASSKEY}/raw/range", params={"start": start, "end": end}).json()
+        agg_body = c.get(f"/data/{PASSKEY}/1m/range", params={"start": start, "end": end}).json()
 
-        print(f"{raw}")
-        print(f"{agg_1m}")
-        check(len(raw) > 0, f"raw range returns rows (got {len(raw)})")
-        check(len(agg_1m) > 0, f"1m range returns rows (got {len(agg_1m)})")
+        check("data" in raw_body and "storage_status" in raw_body, "raw range response has 'data' and 'storage_status'")
+
+        raw_rows = raw_body["data"]
+        agg_rows = agg_body["data"]
+
+        check(len(raw_rows) > 0, f"raw range returns rows (got {len(raw_rows)})")
+        check(len(agg_rows) > 0, f"1m range returns rows (got {len(agg_rows)})")
         check(
-            len(agg_1m) < len(raw),
-            f"1m aggregate has fewer rows than raw over the same window ({len(agg_1m)} < {len(raw)})",
+            len(agg_rows) < len(raw_rows),
+            f"1m aggregate has fewer rows than raw over the same window ({len(agg_rows)} < {len(raw_rows)})",
         )
 
         # narrowing the window should return a subset, not more
         narrow_end = (now - datetime.timedelta(minutes=55)).isoformat()
-        narrow = c.get(f"/data/{PASSKEY}/raw/range", params={"start": start, "end": narrow_end}).json()
-        check(len(narrow) <= len(raw), f"narrower window returns <= rows ({len(narrow)} <= {len(raw)})")
+        narrow_rows = c.get(
+            f"/data/{PASSKEY}/raw/range", params={"start": start, "end": narrow_end}
+        ).json()["data"]
+        check(
+            len(narrow_rows) <= len(raw_rows),
+            f"narrower window returns <= rows ({len(narrow_rows)} <= {len(raw_rows)})",
+        )
 
         # start > end -> 400
         resp = c.get(f"/data/{PASSKEY}/raw/range", params={"start": end, "end": start})
@@ -46,8 +54,7 @@ def main() -> None:
             params={"start": "2000-01-01T00:00:00Z", "end": "2000-01-02T00:00:00Z"},
         )
         check(resp.status_code == 200, "range with no matching data -> 200 (not an error)")
-        check(resp.json() == [], "range with no matching data -> empty list")
-        print(f"{resp.json()=}")
+        check(resp.json()["data"] == [], "range with no matching data -> empty data list")
 
     summarize_and_exit()
 

@@ -97,6 +97,7 @@ dependencies = [
     { name = "pint", version = "0.24.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pint", version = "0.25.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "polars" },
+    { name = "pydantic-settings" },
 ]
 
 [package.dev-dependencies]
@@ -109,6 +110,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.139.2" },
     { name = "pint", specifier = ">=0.24.4" },
     { name = "polars", specifier = ">=1.42.1" },
+    { name = "pydantic-settings", specifier = ">=2.14.2" },
 ]
 
 [package.metadata.requires-dev]
