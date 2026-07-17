@@ -42,10 +42,14 @@ templates in this API:
     /data/{station_id}/{data_type}/range
     /storage/status
 
-`--weatherstations` values must be the whitelisted station's HASH (the
-station_id printed by scripts/add_weather_station.py), NOT the
-station's raw PASSKEY - the raw PASSKEY is never used as an identifier
-anywhere past the initial whitelist check on ingestion.
+`--weatherstations` values may be either the whitelisted station's HASH
+(the station_id printed by scripts/add_weather_station.py) or the
+station's raw PASSKEY - if you pass a raw PASSKEY, it's automatically
+resolved against stations.json and the HASH is what actually gets
+stored, never the raw value. If it can't be resolved (that station was
+never whitelisted), this script fails loudly with a clear error rather
+than silently storing something that will never match anything at
+auth time.
 
 Add --key <existing-raw-key> to hash and store a key you already have
 instead of generating a new one (e.g. re-registering a rotated key).
@@ -63,8 +67,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.security.api_key import generate_raw_key, hash_key  # noqa: E402
+from app.security.station_store import StationStore  # noqa: E402
 
 KEYS_FILE = Path(__file__).resolve().parent.parent / "keys.json"
+STATIONS_FILE = Path(__file__).resolve().parent.parent / "stations.json"
+HASH_PREFIX = "pbkdf2_sha256$"
 
 
 def load_keys() -> list[dict]:
@@ -78,6 +85,38 @@ def save_keys(keys: list[dict]) -> None:
     with KEYS_FILE.open("w", encoding="utf-8") as f:
         json.dump(keys, f, indent=2)
         f.write("\n")
+
+
+def resolve_weatherstations(values: list[str]) -> list[str]:
+    """Resolve every value to a station hash before it's ever written to
+    keys.json.
+
+    - "*" passes through unchanged (wildcard).
+    - A value already in the "pbkdf2_sha256$..." hash format passes
+      through unchanged (assumed to already be a valid station_id).
+    - Anything else is treated as a raw PASSKEY and looked up against
+      stations.json - the very same matching logic used at ingestion.
+      If it doesn't match any whitelisted station, this raises rather
+      than storing a value that could never match a real station_id.
+    """
+    station_store = StationStore(STATIONS_FILE)
+    resolved = []
+    for value in values:
+        if value == "*" or value.startswith(HASH_PREFIX):
+            resolved.append(value)
+            continue
+        record = station_store.find_matching(value)
+        if record is None:
+            raise SystemExit(
+                f"ERROR: {value!r} is not a whitelisted station.\n"
+                "It's not '*', it doesn't already look like a station hash, and it "
+                "doesn't match anything in stations.json.\n"
+                f"Whitelist it first: uv run scripts/add_weather_station.py --passkey {value!r}\n"
+                "then re-run this command."
+            )
+        print(f"  resolved weatherstation {value!r} -> its whitelisted hash")
+        resolved.append(record.salted_station_hash)
+    return resolved
 
 
 def split_csv(value: str) -> list[str]:
@@ -98,7 +137,8 @@ def main() -> None:
         "--endpoints", help="comma-separated list of allowed endpoint paths, or '*' for all"
     )
     parser.add_argument(
-        "--weatherstations", help="comma-separated list of allowed PASSKEYs, or '*' for all"
+        "--weatherstations",
+        help="comma-separated list of allowed station hashes or raw PASSKEYs, or '*' for all",
     )
     parser.add_argument(
         "--key", help="hash and store this raw key instead of generating a new one"
@@ -110,11 +150,14 @@ def main() -> None:
         "Endpoints (comma-separated, or * for all)"
     )
     stations_raw = args.weatherstations or prompt_required(
-        "Weather stations / PASSKEYs (comma-separated, or * for all)"
+        "Weather stations - hash or raw PASSKEY (comma-separated, or * for all)"
     )
 
     endpoints = ["*"] if endpoints_raw.strip() == "*" else split_csv(endpoints_raw)
-    weatherstations = ["*"] if stations_raw.strip() == "*" else split_csv(stations_raw)
+    weatherstations_input = (
+        ["*"] if stations_raw.strip() == "*" else split_csv(stations_raw)
+    )
+    weatherstations = resolve_weatherstations(weatherstations_input)
 
     key_was_generated = args.key is None
     raw_key = args.key or generate_raw_key()
