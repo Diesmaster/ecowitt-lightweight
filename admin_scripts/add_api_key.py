@@ -31,16 +31,21 @@ Non-interactive usage (e.g. for scripting):
 
     uv run scripts/add_api_key.py \\
         --title "Dashboard" \\
-        --endpoints "/data/{passkey}/{data_type}/current,/data/{passkey}/{data_type}/range" \\
-        --weatherstations "B96E45FC2A34AF43A95098BDCC2FF855"
+        --endpoints "/data/{station_id}/{data_type}/current,/data/{station_id}/{data_type}/range" \\
+        --weatherstations "<station_id from scripts/add_weather_station.py>"
 
 `--endpoints` values must match a route's exact path template (curly
 braces and all) - see app/security/dependencies.py for why. Available
 templates in this API:
     /data/report/                          (never actually needs a key - see note below)
-    /data/{passkey}/{data_type}/current
-    /data/{passkey}/{data_type}/range
+    /data/{station_id}/{data_type}/current
+    /data/{station_id}/{data_type}/range
     /storage/status
+
+`--weatherstations` values must be the whitelisted station's HASH (the
+station_id printed by scripts/add_weather_station.py), NOT the
+station's raw PASSKEY - the raw PASSKEY is never used as an identifier
+anywhere past the initial whitelist check on ingestion.
 
 Add --key <existing-raw-key> to hash and store a key you already have
 instead of generating a new one (e.g. re-registering a rotated key).

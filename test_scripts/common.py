@@ -13,6 +13,7 @@ then run whichever script you want:
     uv run scripts/test_range.py
     uv run scripts/test_storage_status.py
     uv run scripts/test_auth.py
+    uv run scripts/test_station_whitelist.py
 
 or all of them in order:
 
@@ -22,11 +23,16 @@ Each script prints PASS/FAIL per check and exits non-zero on any
 failure, so they're still usable in CI without pytest.
 
 Most of the API now requires an X-API-Key header (see
-app.security.dependencies). To keep these scripts self-contained, this
-module auto-provisions a wildcard test key directly into keys.json the
-first time it's imported, and client() attaches it by default. Tests
-that specifically need auth *failures* (missing key, wrong scope) build
-their own client/headers rather than using this default.
+app.security.dependencies), and every incoming reading's PASSKEY must
+be whitelisted (see app.security.station_auth). To keep these scripts
+self-contained, this module auto-provisions both a wildcard test API
+key and a whitelisted test station directly into keys.json/
+stations.json the first time it's imported.
+
+PASSKEY (the raw value) is what you send in a POST /data/report/ body,
+same as always. TEST_STATION_HASH is the whitelisted hash of that same
+PASSKEY - the value everything else (GET URLs, API key
+`weatherstations` scoping) now uses instead.
 """
 
 from __future__ import annotations
@@ -46,8 +52,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.security.api_key import hash_key  # noqa: E402
 
 KEYS_FILE = Path(__file__).resolve().parent.parent / "keys.json"
+STATIONS_FILE = Path(__file__).resolve().parent.parent / "stations.json"
+
 TEST_KEY_TITLE = "Test Suite (auto)"
 TEST_API_KEY = "test-suite-static-raw-key-do-not-use-in-prod"
+
+TEST_STATION_TITLE = "Test Suite Station (auto)"
 
 
 def _ensure_test_api_key() -> None:
@@ -75,7 +85,31 @@ def _ensure_test_api_key() -> None:
         f.write("\n")
 
 
+def _ensure_test_station_whitelisted() -> str:
+    """Idempotently make sure PASSKEY is whitelisted, and return the
+    ACTUAL stored hash for it (never independently recomputed - hash_key()
+    uses a fresh random salt every call, so recomputing would produce a
+    different string than whatever's actually stored; this must read
+    back the one real stations.json entry to get a stable value)."""
+    stations = []
+    if STATIONS_FILE.exists():
+        with STATIONS_FILE.open("r", encoding="utf-8") as f:
+            stations = json.load(f)
+
+    existing = next((s for s in stations if s.get("title") == TEST_STATION_TITLE), None)
+    if existing is not None:
+        return existing["salted_station_hash"]
+
+    salted_station_hash = hash_key(PASSKEY)
+    stations.append({"title": TEST_STATION_TITLE, "salted_station_hash": salted_station_hash})
+    with STATIONS_FILE.open("w", encoding="utf-8") as f:
+        json.dump(stations, f, indent=2)
+        f.write("\n")
+    return salted_station_hash
+
+
 _ensure_test_api_key()
+TEST_STATION_HASH = _ensure_test_station_whitelisted()
 
 _failures: list[str] = []
 

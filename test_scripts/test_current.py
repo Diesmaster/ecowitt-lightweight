@@ -8,13 +8,13 @@ Run the server first, ideally after seeding data:
 
 from __future__ import annotations
 
-from common import PASSKEY, check, client, summarize_and_exit
+from common import PASSKEY, TEST_STATION_HASH, check, client, summarize_and_exit
 
 
 def main() -> None:
     with client() as c:
         for data_type in ("raw", "1m", "1h", "1d"):
-            resp = c.get(f"/data/{PASSKEY}/{data_type}/current")
+            resp = c.get(f"/data/{TEST_STATION_HASH}/{data_type}/current")
             if not check(resp.status_code == 200, f"{data_type}: current -> 200"):
                 continue
             body = resp.json()
@@ -39,7 +39,7 @@ def main() -> None:
         resp = c.get("/data/NOT-A-REAL-PASSKEY/raw/current")
         check(resp.status_code == 404, "unknown passkey -> 404")
 
-        resp = c.get(f"/data/{PASSKEY}/bogus/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/bogus/current")
         check(resp.status_code == 422, "invalid data_type -> 422")
 
     summarize_and_exit()

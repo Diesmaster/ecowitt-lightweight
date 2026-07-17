@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime
 
-from common import PASSKEY, check, client, summarize_and_exit
+from common import PASSKEY, TEST_STATION_HASH, check, client, summarize_and_exit
 
 
 def main() -> None:
@@ -19,8 +19,8 @@ def main() -> None:
         start = (now - datetime.timedelta(hours=1)).isoformat()
         end = (now + datetime.timedelta(minutes=1)).isoformat()
 
-        raw_body = c.get(f"/data/{PASSKEY}/raw/range", params={"start": start, "end": end}).json()
-        agg_body = c.get(f"/data/{PASSKEY}/1m/range", params={"start": start, "end": end}).json()
+        raw_body = c.get(f"/data/{TEST_STATION_HASH}/raw/range", params={"start": start, "end": end}).json()
+        agg_body = c.get(f"/data/{TEST_STATION_HASH}/1m/range", params={"start": start, "end": end}).json()
 
         check("data" in raw_body and "storage_status" in raw_body, "raw range response has 'data' and 'storage_status'")
 
@@ -37,7 +37,7 @@ def main() -> None:
         # narrowing the window should return a subset, not more
         narrow_end = (now - datetime.timedelta(minutes=55)).isoformat()
         narrow_rows = c.get(
-            f"/data/{PASSKEY}/raw/range", params={"start": start, "end": narrow_end}
+            f"/data/{TEST_STATION_HASH}/raw/range", params={"start": start, "end": narrow_end}
         ).json()["data"]
         check(
             len(narrow_rows) <= len(raw_rows),
@@ -45,12 +45,12 @@ def main() -> None:
         )
 
         # start > end -> 400
-        resp = c.get(f"/data/{PASSKEY}/raw/range", params={"start": end, "end": start})
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/range", params={"start": end, "end": start})
         check(resp.status_code == 400, "start > end -> 400")
 
         # a range with no matching data is a valid empty result, not an error
         resp = c.get(
-            f"/data/{PASSKEY}/raw/range",
+            f"/data/{TEST_STATION_HASH}/raw/range",
             params={"start": "2000-01-01T00:00:00Z", "end": "2000-01-02T00:00:00Z"},
         )
         check(resp.status_code == 200, "range with no matching data -> 200 (not an error)")

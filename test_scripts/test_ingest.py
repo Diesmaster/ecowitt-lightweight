@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime
 
-from common import PASSKEY, check, client, summarize_and_exit
+from common import PASSKEY, TEST_STATION_HASH, check, client, summarize_and_exit
 
 
 def main() -> None:
@@ -48,14 +48,19 @@ def main() -> None:
         c.post("/data/report/", data={**good, "dateutc": repost_str, "tempf": "80.0"})
 
         window = c.get(
-            f"/data/{PASSKEY}/raw/range",
+            f"/data/{TEST_STATION_HASH}/raw/range",
             params={
                 "start": (repost_ts - datetime.timedelta(seconds=1)).isoformat(),
                 "end": (repost_ts + datetime.timedelta(seconds=1)).isoformat(),
             },
-        ).json()
+        ).json()["data"]
         if check(len(window) == 1, f"resending same timestamp upserts, not duplicates (got {len(window)} row(s))"):
             check(window[0]["tempf"] == 80.0, "upsert kept the LATEST value (80.0), not the first (70.0)")
+            check(
+                window[0]["PASSKEY"] == TEST_STATION_HASH,
+                "stored row's PASSKEY column is the HASHED station id, not the raw PASSKEY",
+            )
+            check(window[0]["PASSKEY"] != PASSKEY, "stored row's PASSKEY column is NOT the raw PASSKEY")
 
     summarize_and_exit()
 

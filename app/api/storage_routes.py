@@ -12,8 +12,8 @@ Like every other GET endpoint, this reads the cache rather than
 re-walking the data directory - see app.services.storage_status_cache.
 
 Requires a valid `X-API-Key` header - see app.security.dependencies.
-This route has no `passkey` path parameter, so only endpoint scoping
-applies, not per-station scoping.
+This route has no `station_id` path parameter, so only endpoint
+scoping applies, not per-station scoping.
 """
 
 from __future__ import annotations

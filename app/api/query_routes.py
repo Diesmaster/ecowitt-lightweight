@@ -1,7 +1,13 @@
 """Read endpoints: current reading and time-range queries.
 
-    GET /data/{passkey}/{data_type}/current
-    GET /data/{passkey}/{data_type}/range?start=...&end=...
+    GET /data/{station_id}/{data_type}/current
+    GET /data/{station_id}/{data_type}/range?start=...&end=...
+
+`station_id` is the whitelisted station's SALTED HASH (see
+app.security.station_auth) - never the station's raw PASSKEY. That
+hash is what scripts/add_weather_station.py prints when you register a
+station, and what you use both in these URLs and in an API key's
+`weatherstations` list (scripts/add_api_key.py).
 
 `data_type` is one of "raw", "1m", "1h", "1d" - the four tables written
 by the ingestion route (see app.storage.registry.DATA_TYPE_STORES).
@@ -16,7 +22,7 @@ disk-usage cache, appended for free rather than recomputed per request;
 see app.services.storage_status_cache.
 
 Both endpoints require a valid `X-API-Key` header, scoped to this
-route and to the requested `passkey` - see app.security.dependencies.
+route and to the requested `station_id` - see app.security.dependencies.
 """
 
 from __future__ import annotations
@@ -44,14 +50,14 @@ def _ensure_utc(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
 
-@router.get("/data/{passkey}/{data_type}/current", dependencies=[Depends(require_api_key)])
-def get_current(passkey: str, data_type: DataType):
+@router.get("/data/{station_id}/{data_type}/current", dependencies=[Depends(require_api_key)])
+def get_current(station_id: str, data_type: DataType):
     store = DATA_TYPE_STORES[data_type.value]
-    row = store.read_latest(passkey)
+    row = store.read_latest(station_id)
     if row.is_empty():
         raise HTTPException(
             status_code=404,
-            detail=f"no '{data_type.value}' data found for station {passkey!r}",
+            detail=f"no '{data_type.value}' data found for station_id {station_id!r}",
         )
     return {
         "data": row.to_dicts()[0],
@@ -59,9 +65,9 @@ def get_current(passkey: str, data_type: DataType):
     }
 
 
-@router.get("/data/{passkey}/{data_type}/range", dependencies=[Depends(require_api_key)])
+@router.get("/data/{station_id}/{data_type}/range", dependencies=[Depends(require_api_key)])
 def get_range(
-    passkey: str,
+    station_id: str,
     data_type: DataType,
     start: datetime = Query(
         ..., description="range start, inclusive (ISO 8601; UTC assumed if no offset given)"
@@ -75,7 +81,7 @@ def get_range(
         raise HTTPException(status_code=400, detail="'start' must be <= 'end'")
 
     store = DATA_TYPE_STORES[data_type.value]
-    df = store.read_range(passkey, start, end)
+    df = store.read_range(station_id, start, end)
     return {
         "data": df.to_dicts(),
         "storage_status": storage_status_cache.current.to_dict(),

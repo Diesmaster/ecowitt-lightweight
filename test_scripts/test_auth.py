@@ -9,6 +9,11 @@ scripts/add_api_key.py's CLI) so the scoping checks are deterministic:
 a station-scoped key, an endpoint-scoped key, and confirms missing/
 wrong keys are rejected. It also proves the key store hot-reloads a
 newly added key without a server restart, rather than assuming it.
+
+Note: `weatherstations` scoping and GET URLs use TEST_STATION_HASH (the
+whitelisted station's hash), NOT the raw PASSKEY - see
+app.security.station_auth and scripts/test_station_whitelist.py for
+whitelist-specific behavior.
 """
 
 from __future__ import annotations
@@ -17,15 +22,15 @@ import json
 import sys
 from pathlib import Path
 
-from common import PASSKEY, TEST_API_KEY, anonymous_client, check, client, summarize_and_exit
+from common import PASSKEY, TEST_API_KEY, TEST_STATION_HASH, anonymous_client, check, client, summarize_and_exit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.security.api_key import hash_key  # noqa: E402
 
 KEYS_FILE = Path(__file__).resolve().parent.parent / "keys.json"
 
-OTHER_STATION = "SOME-OTHER-STATION-PASSKEY"
-CURRENT_ROUTE = "/data/{passkey}/{data_type}/current"
+OTHER_STATION_ID = "some-other-stations-hash-that-does-not-match-anything"
+CURRENT_ROUTE = "/data/{station_id}/{data_type}/current"
 
 
 def _add_key(title: str, endpoints: list[str], weatherstations: list[str], raw_key: str) -> None:
@@ -50,18 +55,18 @@ def _add_key(title: str, endpoints: list[str], weatherstations: list[str], raw_k
 
 def check_missing_and_wrong_key() -> None:
     with anonymous_client() as c:
-        resp = c.get(f"/data/{PASSKEY}/raw/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/current")
         check(resp.status_code == 401, "no X-API-Key header -> 401")
 
     with anonymous_client() as c:
         c.headers["X-API-Key"] = "this-key-does-not-exist-anywhere"
-        resp = c.get(f"/data/{PASSKEY}/raw/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/current")
         check(resp.status_code == 401, "garbage X-API-Key -> 401")
 
 
 def check_wildcard_key_works() -> None:
     with client() as c:  # uses the auto-provisioned wildcard TEST_API_KEY
-        resp = c.get(f"/data/{PASSKEY}/raw/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/current")
         check(
             resp.status_code in (200, 404),
             f"wildcard key is accepted (got {resp.status_code}, 404 is fine if no data seeded yet)",
@@ -74,20 +79,20 @@ def check_station_scoping() -> None:
     _add_key(
         title="Station-Scoped Test Key",
         endpoints=["*"],
-        weatherstations=[PASSKEY],
+        weatherstations=[TEST_STATION_HASH],  # the HASH, not the raw PASSKEY
         raw_key=raw_key,
     )
 
     with anonymous_client() as c:
         c.headers["X-API-Key"] = raw_key
 
-        resp = c.get(f"/data/{PASSKEY}/raw/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/current")
         check(
             resp.status_code != 403,
             f"station-scoped key allowed on its own station (got {resp.status_code})",
         )
 
-        resp = c.get(f"/data/{OTHER_STATION}/raw/current")
+        resp = c.get(f"/data/{OTHER_STATION_ID}/raw/current")
         check(resp.status_code == 403, f"station-scoped key rejected on a different station (got {resp.status_code})")
 
 
@@ -103,7 +108,7 @@ def check_endpoint_scoping() -> None:
     with anonymous_client() as c:
         c.headers["X-API-Key"] = raw_key
 
-        resp = c.get(f"/data/{PASSKEY}/raw/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/current")
         check(resp.status_code != 403, f"endpoint-scoped key allowed on its own endpoint (got {resp.status_code})")
 
         resp = c.get("/storage/status")
@@ -143,14 +148,14 @@ def check_hot_reload_without_restart() -> None:
 
     with anonymous_client() as c:
         c.headers["X-API-Key"] = raw_key
-        resp = c.get(f"/data/{PASSKEY}/raw/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/current")
         check(resp.status_code == 401, "brand new key not yet registered -> 401 (sanity check)")
 
     _add_key(title="Hot Reload Test Key", endpoints=["*"], weatherstations=["*"], raw_key=raw_key)
 
     with anonymous_client() as c:
         c.headers["X-API-Key"] = raw_key
-        resp = c.get(f"/data/{PASSKEY}/raw/current")
+        resp = c.get(f"/data/{TEST_STATION_HASH}/raw/current")
         check(
             resp.status_code != 401,
             f"same key now accepted immediately after being added, no restart (got {resp.status_code})",
