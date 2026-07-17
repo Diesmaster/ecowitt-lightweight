@@ -1,0 +1,16 @@
+[project]
+name = "ecowitt-weather-stasion"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi[standard]>=0.139.2",
+    "pint>=0.24.4",
+    "polars>=1.42.1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+]
