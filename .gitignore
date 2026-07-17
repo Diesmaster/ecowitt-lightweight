@@ -10,5 +10,6 @@ data/
 data/*
 .env
 keys.json
+stations.json
 # Virtual environments
 .venv
