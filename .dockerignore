@@ -1,0 +1,12 @@
+.venv
+__pycache__
+*.pyc
+.git
+.env
+data/
+keys.json
+stations.json
+server.log
+weather_payloads.jsonl
+Dockerfile
+.dockerignore

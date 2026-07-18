@@ -49,13 +49,14 @@ PASSKEY = "B96E45FC2A34AF43A95098BDCC2FF855"  # matches the real station used th
 # app.* lives at the project root, one level up from this scripts/ folder.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.config import settings  # noqa: E402
 from app.security.api_key import hash_key  # noqa: E402
 
-KEYS_FILE = Path(__file__).resolve().parent.parent / "keys.json"
-STATIONS_FILE = Path(__file__).resolve().parent.parent / "stations.json"
+KEYS_FILE = settings.keys_file
+STATIONS_FILE = settings.stations_file
 
 TEST_KEY_TITLE = "Test Suite (auto)"
-TEST_API_KEY = "zFlvdQ8tbzJRmg9KU9sAqMwbWesHT4a3fwep7hDc7Lw"
+TEST_API_KEY = "test-suite-static-raw-key-do-not-use-in-prod"
 
 TEST_STATION_TITLE = "Test Suite Station (auto)"
 
@@ -80,6 +81,7 @@ def _ensure_test_api_key() -> None:
             "salted_key_hash": hash_key(TEST_API_KEY),
         }
     )
+    KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with KEYS_FILE.open("w", encoding="utf-8") as f:
         json.dump(keys, f, indent=2)
         f.write("\n")
@@ -102,6 +104,7 @@ def _ensure_test_station_whitelisted() -> str:
 
     salted_station_hash = hash_key(PASSKEY)
     stations.append({"title": TEST_STATION_TITLE, "salted_station_hash": salted_station_hash})
+    STATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with STATIONS_FILE.open("w", encoding="utf-8") as f:
         json.dump(stations, f, indent=2)
         f.write("\n")
@@ -109,7 +112,7 @@ def _ensure_test_station_whitelisted() -> str:
 
 
 _ensure_test_api_key()
-TEST_STATION_HASH = "pbkdf2_sha256$600000$19343767841fc1eecb671d7b19fcf27e$97a09d4cf864359d2d2ffbad8b8a41a2b1f0bddbd2bcd60d6075c7249d17b66d"  #_ensure_test_station_whitelisted()
+TEST_STATION_HASH = _ensure_test_station_whitelisted()
 
 _failures: list[str] = []
 

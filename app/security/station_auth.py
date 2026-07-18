@@ -20,14 +20,12 @@ is what's returned. That's what makes it stable across requests.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import HTTPException
 
+from app.config import settings
 from app.security.station_store import StationStore
 
-STATIONS_FILE = Path("stations.json")
-station_store = StationStore(STATIONS_FILE)
+station_store = StationStore(settings.stations_file)
 
 
 def resolve_station_id(raw_passkey: str) -> str:

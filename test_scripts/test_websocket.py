@@ -67,12 +67,13 @@ from websockets.exceptions import InvalidStatus
 from common import anonymous_client, check, summarize_and_exit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.config import settings  # noqa: E402
 from app.security.api_key import hash_key  # noqa: E402
 from app.security.station_store import StationStore  # noqa: E402
 
 WS_BASE = "ws://127.0.0.1:8080"
 HASH_PREFIX = "pbkdf2_sha256$"
-STATIONS_FILE = Path(__file__).resolve().parent.parent / "stations.json"
+STATIONS_FILE = settings.stations_file
 
 
 async def _expect_rejected_handshake(uri: str, description: str) -> None:
@@ -223,6 +224,7 @@ def _resolve_station_id(value: str) -> str:
     stations.append(
         {"title": "Auto-whitelisted by test_websocket.py", "salted_station_hash": salted_station_hash}
     )
+    STATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with STATIONS_FILE.open("w", encoding="utf-8") as f:
         json.dump(stations, f, indent=2)
         f.write("\n")

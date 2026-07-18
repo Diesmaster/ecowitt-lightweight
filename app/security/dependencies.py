@@ -40,15 +40,13 @@ Or, if the handler wants to know which key was used (e.g. for logging):
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import Header, HTTPException, Request, WebSocket, WebSocketException
 
+from app.config import settings
 from app.security.key_store import ApiKeyRecord, KeyStore
 from app.security.station_auth import resolve_station_id
 
-KEYS_FILE = Path("keys.json")
-key_store = KeyStore(KEYS_FILE)
+key_store = KeyStore(settings.keys_file)
 
 
 async def require_api_key(
@@ -143,8 +141,6 @@ async def require_api_key_ws(
     record = key_store.find_matching(api_key)
     if record is None:
         raise WebSocketException(code=1008, reason="Invalid API key")
-
-    print(f"{record=}")
 
     route = websocket.scope.get("route")
     route_template = getattr(route, "path", websocket.url.path)

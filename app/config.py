@@ -7,6 +7,8 @@ with types and defaults enforced by pydantic.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -43,6 +45,21 @@ class Settings(BaseSettings):
                 f"(got error={self.storage_error_gb}, warning={self.storage_warning_gb})"
             )
         return self
+
+    @property
+    def keys_file(self) -> Path:
+        """Where keys.json lives - inside data_dir, not the project
+        root, so a single volume/bind mount over data_dir persists
+        everything that needs to survive a container restart: parquet
+        data, keys.json, and stations.json together. Deliberately a
+        derived property (not its own env var) so there's exactly one
+        knob (DATA_DIR) controlling where all persistent state lives."""
+        return Path(self.data_dir) / "keys.json"
+
+    @property
+    def stations_file(self) -> Path:
+        """See keys_file - same reasoning, same directory."""
+        return Path(self.data_dir) / "stations.json"
 
 
 settings = Settings()

@@ -68,11 +68,12 @@ from pathlib import Path
 # which isn't on sys.path by default when running `uv run scripts/x.py`.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.config import settings  # noqa: E402
 from app.security.api_key import generate_raw_key, hash_key  # noqa: E402
 from app.security.station_store import StationStore  # noqa: E402
 
-KEYS_FILE = Path(__file__).resolve().parent.parent / "keys.json"
-STATIONS_FILE = Path(__file__).resolve().parent.parent / "stations.json"
+KEYS_FILE = settings.keys_file
+STATIONS_FILE = settings.stations_file
 HASH_PREFIX = "pbkdf2_sha256$"
 
 
@@ -84,6 +85,7 @@ def load_keys() -> list[dict]:
 
 
 def save_keys(keys: list[dict]) -> None:
+    KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with KEYS_FILE.open("w", encoding="utf-8") as f:
         json.dump(keys, f, indent=2)
         f.write("\n")

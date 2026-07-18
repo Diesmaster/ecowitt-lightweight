@@ -25,9 +25,10 @@ from pathlib import Path
 from common import PASSKEY, TEST_API_KEY, TEST_STATION_HASH, anonymous_client, check, client, summarize_and_exit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.config import settings  # noqa: E402
 from app.security.api_key import hash_key  # noqa: E402
 
-KEYS_FILE = Path(__file__).resolve().parent.parent / "keys.json"
+KEYS_FILE = settings.keys_file
 
 OTHER_STATION_ID = "some-other-stations-hash-that-does-not-match-anything"
 CURRENT_ROUTE = "/data/{station_id}/{data_type}/current"
@@ -48,6 +49,7 @@ def _add_key(title: str, endpoints: list[str], weatherstations: list[str], raw_k
             "salted_key_hash": hash_key(raw_key),
         }
     )
+    KEYS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with KEYS_FILE.open("w", encoding="utf-8") as f:
         json.dump(keys, f, indent=2)
         f.write("\n")

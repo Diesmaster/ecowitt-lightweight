@@ -23,9 +23,10 @@ from pathlib import Path
 from common import PASSKEY, TEST_STATION_HASH, check, client, summarize_and_exit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from app.config import settings  # noqa: E402
 from app.security.api_key import hash_key  # noqa: E402
 
-STATIONS_FILE = Path(__file__).resolve().parent.parent / "stations.json"
+STATIONS_FILE = settings.stations_file
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
@@ -44,6 +45,7 @@ def _whitelist_station(title: str, raw_passkey: str) -> str:
 
     salted_station_hash = hash_key(raw_passkey)
     stations.append({"title": title, "salted_station_hash": salted_station_hash})
+    STATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with STATIONS_FILE.open("w", encoding="utf-8") as f:
         json.dump(stations, f, indent=2)
         f.write("\n")
