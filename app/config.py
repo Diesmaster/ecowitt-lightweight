@@ -27,15 +27,17 @@ class Settings(BaseSettings):
     # CORS_ORIGINS="http://localhost:5173,https://admin.example.com"
     # Defaults cover Vite's default dev ports so local dev works out of
     # the box; add your real deployed admin URL here for production.
-    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
-
-    @model_validator(mode="before")
-    @classmethod
-    def _split_cors_origins(cls, values: dict) -> dict:
-        raw = values.get("cors_origins")
-        if isinstance(raw, str):
-            values["cors_origins"] = [origin.strip() for origin in raw.split(",") if origin.strip()]
-        return values
+    #
+    # Deliberately typed as `str`, not `list[str]`: pydantic-settings
+    # tries to JSON-decode any list-typed field's env var BEFORE model
+    # validation even runs (at the EnvSettingsSource level), so a plain
+    # comma-separated value like the one above raises a SettingsError
+    # before a `model_validator(mode="before")` on this class ever gets
+    # a chance to split it - confirmed by actually reproducing that
+    # failure, not just reasoned about. Storing the raw string and
+    # splitting it in a computed property below sidesteps that
+    # entirely.
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @model_validator(mode="after")
     def _validate_thresholds(self) -> "Settings":
@@ -45,6 +47,10 @@ class Settings(BaseSettings):
                 f"(got error={self.storage_error_gb}, warning={self.storage_warning_gb})"
             )
         return self
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def keys_file(self) -> Path:
