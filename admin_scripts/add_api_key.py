@@ -41,6 +41,8 @@ templates in this API:
     /data/{station_id}/{data_type}/current
     /data/{station_id}/{data_type}/range
     /storage/status
+    /ws/{station_id}/{data_type}           (WebSocket - see app/api/ws_routes.py)
+    /ws/download/{station_id}/{data_type}  (WebSocket CSV download - see app/api/ws_routes.py)
 
 `--weatherstations` values may be either the whitelisted station's HASH
 (the station_id printed by scripts/add_weather_station.py) or the
