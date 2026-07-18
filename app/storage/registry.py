@@ -12,6 +12,7 @@ from pathlib import Path
 from app.services.aggregation_service import AggregationService
 from app.services.storage_checker_service import StorageCheckerService
 from app.services.storage_status_cache import StorageStatusCache
+from app.services.ws_manager import WebSocketManager
 from app.storage.parquet_store import ParquetTimeSeriesStore
 
 DATA_DIR = Path("data")
@@ -29,6 +30,10 @@ storage_checker_service = StorageCheckerService(data_dir=DATA_DIR)
 # explicitly after every write - see app/api/routes.py. Every GET reads
 # this cache rather than re-walking the data directory itself.
 storage_status_cache = StorageStatusCache(storage_checker_service)
+
+# Tracks WebSocket subscribers per (station_id, data_type) and
+# broadcasts new readings/aggregates to them after every write.
+ws_manager = WebSocketManager()
 
 # The four data types the API exposes, keyed by the name used in the URL.
 DATA_TYPE_STORES: dict[str, ParquetTimeSeriesStore] = {

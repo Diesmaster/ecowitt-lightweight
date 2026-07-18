@@ -103,6 +103,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -114,7 +115,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "httpx", specifier = ">=0.28.1" }]
+dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "websockets", specifier = ">=16.1" },
+]
 
 [[package]]
 name = "email-validator"

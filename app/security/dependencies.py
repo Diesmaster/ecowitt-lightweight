@@ -7,6 +7,11 @@ require_whitelisted_station: for POST /data/report/, checked against
 the station's own PASSKEY field in the request body - stations can't
 send custom headers, so this can't use the same header-based approach.
 
+require_api_key_ws: same idea as require_api_key, but for the
+WebSocket route. Browser WebSocket clients can't set custom headers on
+the handshake, so this reads the key from an `api_key` query parameter
+instead of the `X-API-Key` header.
+
 Usage - attach to any route that should require a key:
 
     @router.get("/data/{station_id}/{data_type}/current",
@@ -19,6 +24,14 @@ Usage - attach to any route that should require a key:
         station_id: str = Depends(require_whitelisted_station),
     ): ...
 
+    @router.websocket("/ws/{station_id}/{data_type}")
+    async def subscribe(
+        websocket: WebSocket,
+        station_id: str,
+        data_type: str,
+        _auth=Depends(require_api_key_ws),
+    ): ...
+
 Or, if the handler wants to know which key was used (e.g. for logging):
 
     def get_current(..., key: ApiKeyRecord = Depends(require_api_key)):
@@ -29,7 +42,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Header, HTTPException, Request, WebSocket, WebSocketException
 
 from app.security.key_store import ApiKeyRecord, KeyStore
 from app.security.station_auth import resolve_station_id
@@ -104,3 +117,45 @@ async def require_whitelisted_station(request: Request) -> str:
     if not raw_passkey:
         raise HTTPException(status_code=422, detail="Missing PASSKEY")
     return resolve_station_id(str(raw_passkey))
+
+
+async def require_api_key_ws(
+    websocket: WebSocket,
+    station_id: str,
+    data_type: str,
+) -> ApiKeyRecord:
+    """WebSocket equivalent of require_api_key.
+
+    Same checks (key exists, endpoint allowed, station allowed), but
+    the key comes from `?api_key=...` in the connection URL rather
+    than a header, and failures close the socket with code 1008
+    (Policy Violation) via WebSocketException instead of raising an
+    HTTPException - there's no HTTP response to send once this is a
+    WebSocket handshake.
+
+    `station_id` and `data_type` are FastAPI path params, resolved the
+    same way for a dependency as for the route itself.
+    """
+    api_key = websocket.query_params.get("api_key")
+    if not api_key:
+        raise WebSocketException(code=1008, reason="Missing api_key query parameter")
+
+    record = key_store.find_matching(api_key)
+    if record is None:
+        raise WebSocketException(code=1008, reason="Invalid API key")
+
+    print(f"{record=}")
+
+    route = websocket.scope.get("route")
+    route_template = getattr(route, "path", websocket.url.path)
+    if not record.allows_endpoint(route_template):
+        raise WebSocketException(
+            code=1008, reason=f"API key '{record.title}' is not authorized for endpoint '{route_template}'"
+        )
+
+    if not record.allows_station(station_id):
+        raise WebSocketException(
+            code=1008, reason=f"API key '{record.title}' is not authorized for station_id '{station_id}'"
+        )
+
+    return record

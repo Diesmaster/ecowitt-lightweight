@@ -3,11 +3,13 @@ from fastapi import FastAPI
 from app.api.query_routes import router as query_router
 from app.api.routes import router as ingestion_router
 from app.api.storage_routes import router as storage_router
+from app.api.ws_routes import router as ws_router
 
 app = FastAPI(title="Weather API")
 app.include_router(ingestion_router)
 app.include_router(query_router)
 app.include_router(storage_router)
+app.include_router(ws_router)
 
 
 if __name__ == "__main__":

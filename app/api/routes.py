@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from app.models.ecowitt import EcowittPayload
 from app.security.dependencies import require_whitelisted_station
-from app.storage.registry import aggregation_service, raw_store, storage_status_cache
+from app.storage.registry import aggregation_service, raw_store, storage_status_cache, ws_manager
 from app.utils.metric_utils import to_metric
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,16 @@ async def receive_report(
     # Recompute 1m/1h/1d rollups from the now-updated raw history. At
     # Ecowitt's ~once-every-30s cadence this is cheap; see
     # AggregationService's docstring if that ever needs to change.
-    await aggregation_service.recompute_all(station_id)
+    aggregates = await aggregation_service.recompute_all(station_id)
+
+    # Push the new reading (and each freshly-recomputed aggregate's
+    # latest bucket) out to any subscribed WebSocket clients. A no-op
+    # if nobody's subscribed to a given channel - see
+    # WebSocketManager.broadcast().
+    await ws_manager.broadcast(station_id, "raw", row)
+    for interval, df in aggregates.items():
+        if not df.is_empty():
+            await ws_manager.broadcast(station_id, interval, df.tail(1).to_dicts()[0])
 
     # Every write changes disk usage, so this is the point that
     # invalidates the cache - GET endpoints just read it, they never

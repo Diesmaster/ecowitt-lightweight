@@ -55,7 +55,7 @@ KEYS_FILE = Path(__file__).resolve().parent.parent / "keys.json"
 STATIONS_FILE = Path(__file__).resolve().parent.parent / "stations.json"
 
 TEST_KEY_TITLE = "Test Suite (auto)"
-TEST_API_KEY = "test-suite-static-raw-key-do-not-use-in-prod"
+TEST_API_KEY = "zFlvdQ8tbzJRmg9KU9sAqMwbWesHT4a3fwep7hDc7Lw"
 
 TEST_STATION_TITLE = "Test Suite Station (auto)"
 
@@ -109,7 +109,7 @@ def _ensure_test_station_whitelisted() -> str:
 
 
 _ensure_test_api_key()
-TEST_STATION_HASH = _ensure_test_station_whitelisted()
+TEST_STATION_HASH = "pbkdf2_sha256$600000$19343767841fc1eecb671d7b19fcf27e$97a09d4cf864359d2d2ffbad8b8a41a2b1f0bddbd2bcd60d6075c7249d17b66d"  #_ensure_test_station_whitelisted()
 
 _failures: list[str] = []
 
