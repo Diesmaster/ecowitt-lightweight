@@ -80,6 +80,25 @@ def _ensure_utc(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
 
+def _parse_iso_datetime(value: str) -> datetime:
+    """Parse an ISO 8601 datetime string, tolerant of a trailing "Z" UTC
+    designator regardless of Python version.
+
+    datetime.fromisoformat() only accepts a trailing "Z" natively as of
+    Python 3.11 - on 3.10 and earlier it raises ValueError for a string
+    like "2026-01-01T00:00:00.000Z", even though that's valid ISO 8601.
+    JavaScript's Date.prototype.toISOString() (used by the admin
+    frontend) always produces exactly that "Z"-suffixed format, so this
+    normalizes "Z" -> "+00:00" before parsing instead of depending on
+    which Python version happens to be running this process. Confirmed
+    by actually reproducing the failure on 3.10 and verifying this fix
+    resolves it, not just reasoned about.
+    """
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    return datetime.fromisoformat(value)
+
+
 @router.websocket("/ws/{station_id}/{data_type}")
 async def subscribe(
     websocket: WebSocket,
@@ -117,8 +136,8 @@ async def download_csv(
         return
 
     try:
-        start = _ensure_utc(datetime.fromisoformat(start_raw))
-        end = _ensure_utc(datetime.fromisoformat(end_raw))
+        start = _ensure_utc(_parse_iso_datetime(start_raw))
+        end = _ensure_utc(_parse_iso_datetime(end_raw))
     except ValueError:
         await websocket.send_json({"error": "'start'/'end' must be ISO 8601 datetimes"})
         await websocket.close(code=1003, reason="invalid start/end")
